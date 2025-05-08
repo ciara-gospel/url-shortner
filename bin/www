@@ -1,90 +1,91 @@
 #!/usr/bin/env node
 
-/**
- * Module dependencies.
- */
+import app from '../app.js';
+import debug from 'debug';
+import http from 'http';
+import { initializeDbSchema, connectToDb, pool } from '../config/db.js';
+import logger from '../utils/logger.js';
 
-var app = require('../app');
-var debug = require('debug')('url-shortner:server');
-var http = require('http');
-
-/**
- * Get port from environment and store in Express.
- */
-
-var port = normalizePort(process.env.PORT || '3000');
+const log = debug('url-shortener:server');
+const port = normalizePort(process.env.PORT || '3500');
 app.set('port', port);
 
-/**
- * Create HTTP server.
- */
-
-var server = http.createServer(app);
-
-/**
- * Listen on provided port, on all network interfaces.
- */
-
-server.listen(port);
-server.on('error', onError);
-server.on('listening', onListening);
-
-/**
- * Normalize a port into a number, string, or false.
- */
+const server = http.createServer(app);
 
 function normalizePort(val) {
-  var port = parseInt(val, 10);
-
-  if (isNaN(port)) {
-    // named pipe
-    return val;
-  }
-
-  if (port >= 0) {
-    // port number
-    return port;
-  }
-
+  const port = parseInt(val, 10);
+  if (isNaN(port)) return val;
+  if (port >= 0) return port;
   return false;
 }
 
-/**
- * Event listener for HTTP server "error" event.
- */
+const signals = ['SIGHUP', 'SIGINT', 'SIGTERM'];
+let shuttingDown = false;
 
-function onError(error) {
-  if (error.syscall !== 'listen') {
-    throw error;
+async function shutdown(signal) {
+  if (shuttingDown) {
+    logger.info(`Already shutting down. Received ${signal}`);
+    return;
   }
 
-  var bind = typeof port === 'string'
-    ? 'Pipe ' + port
-    : 'Port ' + port;
+  shuttingDown = true;
+  logger.info(`Received ${signal}. Shutting down gracefully`);
 
-  // handle specific listen errors with friendly messages
+  try {
+    await pool.end();
+    logger.info('Database pool closed');
+  } catch (err) {
+    logger.error('Error closing database pool', err);
+  }
+
+  server.close((err) => {
+    if (err) {
+      logger.error('Error closing server', err);
+      process.exit(1);
+    }
+    logger.info('Server closed. Exiting process');
+    process.exit(0);
+  });
+}
+
+signals.forEach(signal => process.on(signal, () => shutdown(signal)));
+
+function onError(error) {
+  if (error.syscall !== 'listen') throw error;
+
+  const bind = typeof port === 'string' ? `Pipe ${port}` : `Port ${port}`;
+
   switch (error.code) {
     case 'EACCES':
-      console.error(bind + ' requires elevated privileges');
+      logger.error(`${bind} requires elevated privileges`);
       process.exit(1);
-      break;
     case 'EADDRINUSE':
-      console.error(bind + ' is already in use');
-      process.exit(1);
-      break;
+      logger.error(`${bind} is already in use`);
+      process.exit(1); // don't just retry silently
     default:
       throw error;
   }
 }
 
-/**
- * Event listener for HTTP server "listening" event.
- */
-
 function onListening() {
-  var addr = server.address();
-  var bind = typeof addr === 'string'
-    ? 'pipe ' + addr
-    : 'port ' + addr.port;
-  debug('Listening on ' + bind);
+  const addr = server.address();
+  const bind = typeof addr === 'string' ? `pipe ${addr}` : `port ${addr.port}`;
+  log(`Listening on ${bind}`);
+  console.log(`🚀 Server running at http://localhost:${port}/`);
 }
+
+async function startServer() {
+  try {
+    logger.info(`Attempting to start server on port ${port}`);
+    await connectToDb();
+    await initializeDbSchema();
+    server.listen(port);
+    server.on('error', onError);
+    server.on('listening', onListening);
+  } catch (error) {
+    logger.error('Failed during server startup:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
