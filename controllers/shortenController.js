@@ -24,7 +24,7 @@ export const shortenUrl = async (req, res) => {
     // Crée un short code unique
     const shortCode = nanoid(6); // 6 caractères aléatoires
 
-    const baseUrl = process.env.BASE_URL || req.headers.host;
+    const baseUrl = process.env.BASE_URL || `http://${req.headers.host}`;
     const shortUrl = `${baseUrl}/s/${shortCode}`;
 
     // Sauvegarde dans la base de données
