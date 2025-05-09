@@ -1,22 +1,34 @@
-// test/shortenUrl.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import supertest from 'supertest';
-import app from '../app.js'; // Assure-toi que ton serveur exporte `app`
+import jwt from 'jsonwebtoken';
+import app from '../app.js';
 
 const request = supertest(app);
 
-test('POST /shorten - should shorten a valid URL', async () => {
-  const response = await request.post('/shorten').send({
-    originalUrl: 'https://example.com',
-  });
+// Génère un token JWT valide à utiliser dans les requêtes de test
+const userPayload = {
+  id: 'user123',
+  email: 'test@example.com',
+};
+
+const token = jwt.sign(userPayload, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+test('POST /api/shorten - should shorten a valid URL', async () => {
+  const response = await request
+    .post('/api/shorten')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ originalUrl: 'https://example.com' });
 
   assert.equal(response.statusCode, 201);
-  assert.ok(response.body.shortUrl);
+  assert.ok(response.body.shortUrl, 'shortUrl should be returned');
 });
 
-test('POST /shorten - should fail if originalUrl is missing', async () => {
-  const response = await request.post('/shorten').send({});
+test('POST /api/shorten - should fail if originalUrl is missing', async () => {
+  const response = await request
+    .post('/api/shorten')
+    .set('Authorization', `Bearer ${token}`)
+    .send({});
 
   assert.equal(response.statusCode, 400);
   assert.equal(response.body.message, 'Original URL is required');
