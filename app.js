@@ -1,19 +1,30 @@
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
+import express from 'express'
+import path from 'path'
+import cookieParser from 'cookie-parser'
+import winstonLogger from './utils/logger.js'
+import morgan from 'morgan'
+import swaggerUi from "swagger-ui-express"
+import swaggerSpec from './swaggerConfig.js'
+import shortenRouter from './routes/shorten.js'
+import myUrlsRouter from './routes/myUrls.js'
+import errorHandler from './middlewares/errorHandler.js'
+import dotenv from 'dotenv'
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename) 
+dotenv.config();
 
-var app = express();
+import indexRouter from './routes/index.js'
+import usersRouter from './routes/users.js'
+import authRouter from './routes/authRoutes.js'
+//import redirectRouter from './routes/redirectRoutes.js'
 
-// view engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'jade');
+const app = express();
 
-app.use(logger('dev'));
+const morganFormat = process.env.NODE_ENV === "production" ? "dev" : 'combined'
+app.use(morgan(morganFormat, { stream: winstonLogger.stream }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -21,21 +32,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/shorten', shortenRouter);
+app.use('/api/my-urls', myUrlsRouter);
+app.use(errorHandler);
+//app.use('/s', redirectRouter)
 
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  next(createError(404));
-});
 
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
-  // render the error page
-  res.status(err.status || 500);
-  res.render('error');
-});
-
-module.exports = app;
+export default app;

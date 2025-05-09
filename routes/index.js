@@ -1,9 +1,10 @@
-var express = require('express');
-var router = express.Router();
+//routes/index
+
+import express from 'express'
+import { handleRedirect } from '../controllers/redirectController.js';
+const router = express.Router();
 
 /* GET home page. */
-router.get('/', function(req, res, next) {
-  res.render('index', { title: 'Express' });
-});
+router.get('/s/:shortCode',handleRedirect);
 
-module.exports = router;
+export default router;
