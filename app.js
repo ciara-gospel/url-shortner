@@ -7,6 +7,7 @@ import swaggerUi from "swagger-ui-express"
 import swaggerSpec from './swaggerConfig.js'
 import shortenRouter from './routes/shorten.js'
 import myUrlsRouter from './routes/myUrls.js'
+import errorHandler from './middlewares/errorHandler.js'
 import dotenv from 'dotenv'
 
 import { fileURLToPath } from 'url'
@@ -34,6 +35,7 @@ app.use('/users', usersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/shorten', shortenRouter);
 app.use('/api/my-urls', myUrlsRouter);
+app.use(errorHandler);
 //app.use('/s', redirectRouter)
 
 
